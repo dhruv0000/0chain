@@ -5,6 +5,7 @@ import (
 
 	"github.com/0chain/gosdk/zmagmacore/errors"
 	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
+	"github.com/0chain/gosdk/zmagmacore/time"
 
 	chain "0chain.net/chaincore/chain/state"
 	"0chain.net/chaincore/state"
@@ -16,6 +17,7 @@ type (
 	// tokenPool represents token pool wrapper implementation.
 	tokenPool struct {
 		zmc.TokenPool
+		ExpireAt time.Timestamp `json:"expire_at,omitempty"`
 	}
 )
 
@@ -38,61 +40,58 @@ func (m *tokenPool) Decode(blob []byte) error {
 
 	m.ID = pool.ID
 	m.Balance = pool.Balance
+	m.HolderID = pool.HolderID
 	m.PayerID = pool.PayerID
 	m.PayeeID = pool.PayeeID
+	m.ExpireAt = pool.ExpireAt
 
 	return nil
 }
 
-// Encode implements util.Serializable interface.
-func (m *tokenPool) Encode() []byte {
-	blob, _ := json.Marshal(m)
-	return blob
-}
-
 // create tries to create a new token poll by given acknowledgment.
-func (m *tokenPool) create(txn *tx.Transaction, ackn *zmc.Acknowledgment, sci chain.StateContextI) error {
-	m.Balance = ackn.Terms.GetAmount()
+func (m *tokenPool) create(txn *tx.Transaction, cfg zmc.PoolConfigurator, sci chain.StateContextI) error {
+	m.Balance = cfg.PoolBalance()
 	if m.Balance < 0 {
 		return errors.Wrap(errCodeTokenPoolCreate, errTextUnexpected, errNegativeValue)
 	}
 
-	poolBalance := state.Balance(m.Balance)
-	clientBalance, err := sci.GetClientBalance(ackn.Consumer.ID)
+	m.PayerID = cfg.PoolPayerID()
+	clientBalance, err := sci.GetClientBalance(m.PayerID)
 	if err != nil && !errors.Is(err, util.ErrValueNotPresent) {
 		return errors.Wrap(errCodeTokenPoolCreate, "fetch client balance failed", err)
 	}
+
+	poolBalance := state.Balance(m.Balance)
 	if clientBalance < poolBalance {
 		return errors.Wrap(errCodeTokenPoolCreate, errTextUnexpected, errInsufficientFunds)
 	}
 
-	m.ID = ackn.SessionID
-	m.PayerID = ackn.Consumer.ID
-	m.PayeeID = ackn.Provider.ID
-
-	transfer := state.NewTransfer(m.PayerID, txn.ToClientID, poolBalance)
+	m.HolderID = cfg.PoolHolderID()
+	transfer := state.NewTransfer(m.PayerID, m.HolderID, poolBalance)
 	if err = sci.AddTransfer(transfer); err != nil {
 		return errors.Wrap(errCodeTokenPoolCreate, "transfer token pool failed", err)
 	}
 
+	m.ID = cfg.PoolID()
+	m.PayeeID = cfg.PoolPayeeID()
 	m.Transfers = append(m.Transfers, zmc.TokenPoolTransfer{
 		TxnHash:    txn.Hash,
 		ToPool:     m.ID,
 		Value:      m.Balance,
 		FromClient: m.PayerID,
-		ToClient:   txn.ToClientID, // delegate transfer to smart contract address
+		ToClient:   m.HolderID, // make transfer to the holder address
 	})
 
 	return nil
 }
 
 // spend tries to spend the token pool by given amount.
-func (m *tokenPool) spend(txn *tx.Transaction, bill *zmc.Billing, sci chain.StateContextI) error {
-	if bill.Amount < 0 {
-		return errors.Wrap(errCodeTokenPoolSpend, "billing amount is negative", errNegativeValue)
+func (m *tokenPool) spend(txn *tx.Transaction, amount state.Balance, sci chain.StateContextI) error {
+	if amount < 0 {
+		return errors.Wrap(errCodeTokenPoolSpend, "spend amount is negative", errNegativeValue)
 	}
 
-	payee, amount, poolBalance := m.PayeeID, state.Balance(bill.Amount), state.Balance(m.Balance)
+	payee, poolBalance := m.PayeeID, state.Balance(m.Balance)
 	switch {
 	case amount == 0: // refund token pool to payer
 		payee = m.PayerID
@@ -114,15 +113,10 @@ func (m *tokenPool) spend(txn *tx.Transaction, bill *zmc.Billing, sci chain.Stat
 	m.Transfers = append(m.Transfers, zmc.TokenPoolTransfer{
 		TxnHash:    txn.Hash,
 		FromPool:   m.ID,
-		Value:      bill.Amount,
+		Value:      int64(amount),
 		FromClient: m.PayerID,
 		ToClient:   m.PayeeID,
 	})
 
 	return nil
-}
-
-// uid returns uniq id used to saving token pool into chain state.
-func (m *tokenPool) uid(scID string) string {
-	return "sc:" + scID + ":tokenpool:" + m.ID
 }

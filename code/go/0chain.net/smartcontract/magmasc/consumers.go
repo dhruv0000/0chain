@@ -30,13 +30,14 @@ func (m *Consumers) add(scID string, item *zmc.Consumer, db *store.Connection, s
 	return m.write(scID, item, db, sci)
 }
 
-func (m *Consumers) copy() (list Consumers) {
+func (m *Consumers) copy() *Consumers {
+	list := Consumers{}
 	if m.Sorted != nil {
 		list.Sorted = make([]*zmc.Consumer, len(m.Sorted))
 		copy(list.Sorted, m.Sorted)
 	}
 
-	return list
+	return &list
 }
 
 func (m *Consumers) del(id string, db *store.Connection) (*zmc.Consumer, error) {
@@ -155,13 +156,14 @@ func (m *Consumers) write(scID string, item *zmc.Consumer, db *store.Connection,
 		return errors.New(errCodeInternal, "consumer invalid value").Wrap(errNilPointerValue)
 	}
 
-	list := m.copy()
-	if !list.hasEqual(item) { // check if an equal item already added
-		got, found := list.getByHost(item.Host)
+	var list *Consumers
+	if !m.hasEqual(item) { // check if an equal item already added
+		got, found := m.getByHost(item.Host)
 		if found && item.ID != got.ID { // check if a host already registered
 			return errors.New(errCodeInternal, "consumer host already registered: "+item.Host)
 		}
 
+		list = m.copy()
 		list.put(item) // add or replace
 		blob, err := json.Marshal(list.Sorted)
 		if err != nil {
@@ -171,16 +173,15 @@ func (m *Consumers) write(scID string, item *zmc.Consumer, db *store.Connection,
 			return errors.Wrap(errCodeInternal, "insert consumers list failed", err)
 		}
 	}
-
 	if _, err := sci.InsertTrieNode(nodeUID(scID, consumerType, item.ExtID), item); err != nil {
-		_ = db.Conn.Rollback()
 		return errors.Wrap(errCodeInternal, "insert consumer failed", err)
 	}
 	if err := db.Commit(); err != nil {
 		return errors.Wrap(errCodeInternal, "commit changes failed", err)
 	}
-
-	m.Sorted = list.Sorted
+	if list != nil {
+		m.Sorted = list.Sorted
+	}
 
 	return nil
 }

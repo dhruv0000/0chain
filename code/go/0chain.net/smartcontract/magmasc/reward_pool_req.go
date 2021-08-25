@@ -1,0 +1,95 @@
+package magmasc
+
+import (
+	"encoding/json"
+
+	"github.com/0chain/gosdk/core/util"
+	"github.com/0chain/gosdk/zmagmacore/errors"
+	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
+
+	tx "0chain.net/chaincore/transaction"
+)
+
+type (
+	// rewardPoolRequest represents lock pool request implementation.
+	rewardPoolRequest struct {
+		ID       string        `json:"id"`
+		Provider *zmc.Provider `json:"provider"`
+		txn      *tx.Transaction
+	}
+)
+
+var (
+	// Make sure rewardPoolRequest implements Serializable interface.
+	_ util.Serializable = (*rewardPoolRequest)(nil)
+
+	// Make sure rewardPoolRequest implements PoolConfigurator interface.
+	_ zmc.PoolConfigurator = (*rewardPoolRequest)(nil)
+)
+
+// Decode implements util.Serializable interface.
+func (m *rewardPoolRequest) Decode(blob []byte) error {
+	var req rewardPoolRequest
+	if err := json.Unmarshal(blob, &req); err != nil {
+		return errDecodeData.Wrap(err)
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
+	m.ID = req.ID
+	m.Provider = req.Provider
+
+	return nil
+}
+
+// Encode implements util.Serializable interface.
+func (m *rewardPoolRequest) Encode() []byte {
+	blob, _ := json.Marshal(m)
+	return blob
+}
+
+// PoolBalance implements PoolConfigurator interface.
+func (m *rewardPoolRequest) PoolBalance() int64 {
+	return m.txn.Value
+}
+
+// PoolID implements PoolConfigurator interface.
+func (m *rewardPoolRequest) PoolID() string {
+	return m.ID
+}
+
+// PoolHolderID implements PoolConfigurator interface.
+func (m *rewardPoolRequest) PoolHolderID() string {
+	return Address
+}
+
+// PoolPayerID implements PoolConfigurator interface.
+func (m *rewardPoolRequest) PoolPayerID() string {
+	return m.txn.ClientID
+}
+
+// PoolPayeeID implements PoolConfigurator interface.
+func (m *rewardPoolRequest) PoolPayeeID() string {
+	return m.Provider.ID
+}
+
+// Validate checks Acknowledgment for correctness.
+// If it is not return errInvalidAcknowledgment.
+func (m *rewardPoolRequest) Validate() (err error) {
+	switch { // is invalid
+	case m.txn == nil:
+		err = errors.New(errCodeInternal, "transaction data is required")
+
+	case m.txn.Value <= 0:
+		err = errors.New(errCodeInternal, "transaction value is required")
+
+	case m.ID == "":
+		err = errors.New(errCodeBadRequest, "pool id is required")
+
+	case m.Provider == nil || m.Provider.ExtID == "":
+		err = errors.New(errCodeBadRequest, "provider external id is required")
+	}
+
+	return err
+}

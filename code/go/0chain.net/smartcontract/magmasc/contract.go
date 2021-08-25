@@ -10,6 +10,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 
 	chain "0chain.net/chaincore/chain/state"
+	"0chain.net/chaincore/state"
 	tx "0chain.net/chaincore/transaction"
 	store "0chain.net/core/ememorystore"
 )
@@ -62,7 +63,7 @@ func (m *MagmaSmartContract) acknowledgmentAcceptedVerify(_ context.Context, val
 }
 
 // acknowledgmentExist tries to extract Acknowledgment with given id param
-// and returns boolean value of it is existed.
+// and returns boolean value of it is exists.
 func (m *MagmaSmartContract) acknowledgmentExist(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
 	got, _ := sci.GetTrieNode(nodeUID(m.ID, acknowledgment, vals.Get("id")))
 	return got != nil, nil
@@ -93,7 +94,7 @@ func (m *MagmaSmartContract) allProviders(context.Context, url.Values, chain.Sta
 }
 
 // consumerExist tries to extract registered consumer
-// with given external id param and returns boolean value of it is existed.
+// with given external id param and returns boolean value of it is exists.
 func (m *MagmaSmartContract) consumerExist(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
 	got, _ := sci.GetTrieNode(nodeUID(m.ID, consumerType, vals.Get("ext_id")))
 	return got != nil, nil
@@ -121,6 +122,7 @@ func (m *MagmaSmartContract) consumerRegister(txn *tx.Transaction, blob []byte, 
 
 	consumer.ID = txn.ClientID
 	if err = list.add(m.ID, consumer, db, sci); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeConsumerReg, "register consumer failed", err)
 	}
 
@@ -151,13 +153,27 @@ func (m *MagmaSmartContract) consumerSessionStart(txn *tx.Transaction, blob []by
 		return "", errors.Wrap(errCodeSessionStart, "invalid provider terms", err)
 	}
 
+	db := store.GetTransaction(m.db)
+	pools, err := rewardPoolsFetch(allRewardPoolsKey, db)
+	if err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeRewardPoolLock, "fetch token pools list failed", err)
+	}
+
 	pool := newTokenPool()
 	if err = pool.create(txn, ackn, sci); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeSessionStart, "create token pool failed", err)
+	}
+
+	if err = pools.add(m.ID, pool, db, sci); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeSessionStart, "add lock pool to list failed", err)
 	}
 
 	ackn.TokenPool = &pool.TokenPool
 	if _, err = sci.InsertTrieNode(nodeUID(m.ID, acknowledgment, ackn.SessionID), ackn); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeSessionStart, "insert acknowledgment failed", err)
 	}
 
@@ -187,7 +203,8 @@ func (m *MagmaSmartContract) consumerSessionStop(txn *tx.Transaction, blob []byt
 		if err = pool.Decode(ackn.TokenPool.Encode()); err != nil {
 			return "", errors.New(errCodeSessionStop, err.Error())
 		}
-		if err = pool.spend(txn, &ackn.Billing, sci); err != nil {
+		// see finalizeAllocation
+		if err = pool.spend(txn, state.Balance(ackn.Billing.Amount), sci); err != nil {
 			return "", errors.New(errCodeSessionStop, err.Error())
 		}
 
@@ -223,6 +240,7 @@ func (m *MagmaSmartContract) consumerUpdate(txn *tx.Transaction, blob []byte, sc
 
 	consumer.ID = txn.ClientID
 	if err = list.write(m.ID, consumer, db, sci); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeConsumerUpdate, "update consumer list failed", err)
 	}
 
@@ -273,7 +291,7 @@ func (m *MagmaSmartContract) providerDataUsage(txn *tx.Transaction, blob []byte,
 }
 
 // providerExist tries to extract registered provider
-// with given external id param and returns boolean value of it is existed.
+// with given external id param and returns boolean value of it is exists.
 func (m *MagmaSmartContract) providerExist(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
 	got, _ := sci.GetTrieNode(nodeUID(m.ID, providerType, vals.Get("ext_id")))
 	return got != nil, nil
@@ -301,6 +319,7 @@ func (m *MagmaSmartContract) providerRegister(txn *tx.Transaction, blob []byte, 
 
 	provider.ID = txn.ClientID
 	if err = list.add(m.ID, provider, db, sci); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeProviderReg, "register provider failed", err)
 	}
 
@@ -371,10 +390,110 @@ func (m *MagmaSmartContract) providerUpdate(txn *tx.Transaction, blob []byte, sc
 
 	provider.ID = txn.ClientID
 	if err = list.write(m.ID, provider, db, sci); err != nil {
+		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeProviderUpdate, "update providers list failed", err)
 	}
 
 	return string(provider.Encode()), nil
+}
+
+// rewardPoolExist tries to extract registered reward token pool
+// with given id param and returns boolean value of it is exists.
+func (m *MagmaSmartContract) rewardPoolExist(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
+	got, _ := sci.GetTrieNode(nodeUID(m.ID, rewardTokenPool, vals.Get("id")))
+	return got != nil, nil
+}
+
+// rewardPoolFetch tries to extract registered reward token pool
+// with given pool id params and returns it as raw data.
+func (m *MagmaSmartContract) rewardPoolFetch(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
+	data, err := sci.GetTrieNode(nodeUID(m.ID, rewardTokenPool, vals.Get("id")))
+	if err != nil {
+		return nil, err
+	}
+
+	pool := newTokenPool()
+	if err = pool.Decode(data.Encode()); err != nil {
+		return nil, errDecodeData.Wrap(err)
+	}
+
+	return &pool, nil
+}
+
+// rewardPoolLock checks input for validity and creates
+// a new reward pool intended for the payee by provided data.
+func (m *MagmaSmartContract) rewardPoolLock(txn *tx.Transaction, blob []byte, sci chain.StateContextI) (string, error) {
+	var err error
+
+	req := &rewardPoolRequest{txn: txn}
+	if err = req.Decode(blob); err != nil {
+		return "", errors.Wrap(errCodeRewardPoolLock, "decode lock request failed", err)
+	}
+
+	req.Provider, err = providerFetch(m.ID, req.Provider.ExtID, store.GetTransaction(m.db), sci)
+	if err != nil {
+		return "", errors.Wrap(errCodeRewardPoolLock, "fetch provider failed", err)
+	}
+
+	db := store.GetTransaction(m.db)
+	pools, err := rewardPoolsFetch(allRewardPoolsKey, db)
+	if err != nil {
+		return "", errors.Wrap(errCodeRewardPoolLock, "fetch token pools list failed", err)
+	}
+
+	pool := newTokenPool()
+	if err = pool.create(txn, req, sci); err != nil {
+		return "", errors.Wrap(errCodeRewardPoolLock, "create lock pool failed", err)
+	}
+	if err = pools.add(m.ID, pool, db, sci); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeRewardPoolLock, "add lock pool to list failed", err)
+	}
+
+	return string(pool.Encode()), nil
+}
+
+// rewardPoolUnlock checks input for validity and unlocks
+// the reward pool intended for the payee by provided data.
+func (m *MagmaSmartContract) rewardPoolUnlock(txn *tx.Transaction, blob []byte, sci chain.StateContextI) (string, error) {
+	var err error
+
+	req := &rewardPoolRequest{txn: txn}
+	if err = req.Decode(blob); err != nil {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "decode unlock request failed", err)
+	}
+
+	req.Provider, err = providerFetch(m.ID, req.Provider.ExtID, store.GetTransaction(m.db), sci)
+	if err != nil {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "fetch provider failed", err)
+	}
+
+	db := store.GetTransaction(m.db)
+	pools, err := rewardPoolsFetch(allRewardPoolsKey, db)
+	if err != nil {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "fetch reward pools list failed", err)
+	}
+
+	payeeID, poolID := req.PoolPayeeID(), req.PoolID()
+	pool := pools.List[payeeID][poolID]
+	if pool == nil { // found
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "fetch reward pool failed", err)
+	}
+	if pool.PayerID != txn.ClientID {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "check owner id failed", err)
+	}
+	if err = pool.spend(txn, 0, sci); err != nil {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "refund reward pool failed", err)
+	}
+	if _, err = sci.InsertTrieNode(nodeUID(m.ID, rewardTokenPool, pool.ID), pool); err != nil {
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "update reward pool failed", err)
+	}
+	if _, err = pools.del(payeeID, poolID, db); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeRewardPoolUnlock, "delete reward pool failed", err)
+	}
+
+	return string(pool.Encode()), nil
 }
 
 // nodeUID returns an uniq id for Node interacting with magma smart contract.

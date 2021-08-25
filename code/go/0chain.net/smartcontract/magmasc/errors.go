@@ -18,8 +18,10 @@ const (
 	errCodeSessionStart   = "session_start"
 	errCodeSessionStop    = "session_stop"
 
-	errCodeTokenPoolCreate = "token_pool_create"
-	errCodeTokenPoolSpend  = "token_pool_spend"
+	errCodeRewardPoolLock   = "reward_pool_lock"
+	errCodeRewardPoolUnlock = "reward_pool_unlock"
+	errCodeTokenPoolCreate  = "token_pool_create"
+	errCodeTokenPoolSpend   = "token_pool_spend"
 
 	errTextDecode     = "decode error"
 	errTextUnexpected = "unexpected error"

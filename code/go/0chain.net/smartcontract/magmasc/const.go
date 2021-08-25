@@ -1,12 +1,23 @@
 package magmasc
 
+import (
+	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
+)
+
 const (
 	// Address is a SHA3-256 hex encoded hash of "magma" string.
 	// Represents address of MagmaSmartContract.
-	Address = "11f8411db41e34cea7c100f19faff32da8f3cd5a80635731cec06f32d08089be"
+	Address = zmc.Address
 
 	// Name contents the smart contract name.
 	Name = "magma"
+
+	// one billion (Giga) is a unit prefix in metric systems
+	// of units denoting a factor of one billion (1e9 or 1_000_000_000).
+	billion = 1e9
+
+	// colon represents values separator.
+	colon = ":"
 
 	// rootPath describes the magma smart contract's root path.
 	rootPath = ".0chain.net"
@@ -16,14 +27,26 @@ const (
 
 	// storePath describes the magma smart contract's store path.
 	storePath = "data/rocksdb/magmasc"
-
-	// colon represents values separator.
-	colon = ":"
 )
 
 const (
 	// acknowledgment contents a value of acknowledgment string type.
 	acknowledgment = "acknowledgment"
+
+	// allRewardPoolsKey is a concatenated Address
+	// and SHA3-256 hex encoded hash of "all_reward_pools" string.
+	allRewardPoolsKey = Address + "59864241d642b4b6b5e5998b70bd201ca4d48926de8934e02e300950c778c7c2"
+
+	// rewardPoolLock represents the name of MagmaSmartContract function.
+	// When function is called it means that wallet creates a new locked token pool.
+	rewardPoolLock = "reward_pool_lock"
+
+	// rewardPoolUnlock represents the name of MagmaSmartContract function.
+	// When function is called it means that wallet refunds a locked token pool.
+	rewardPoolUnlock = "reward_pool_unlock"
+
+	// rewardTokenPool contents a value of rewardTokenPool string type.
+	rewardTokenPool = "reward_token_pool"
 )
 
 // These constants used to identify smart contract functions by Consumer.

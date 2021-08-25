@@ -47,6 +47,8 @@ func NewMagmaSmartContract() *MagmaSmartContract {
 	msc.RestHandlers["/consumerFetch"] = msc.consumerFetch
 	msc.RestHandlers["/providerExist"] = msc.providerExist
 	msc.RestHandlers["/providerFetch"] = msc.providerFetch
+	msc.RestHandlers["/rewardPoolExist"] = msc.rewardPoolExist
+	msc.RestHandlers["/rewardPoolFetch"] = msc.rewardPoolFetch
 
 	// metrics setup section
 	msc.SmartContractExecutionStats[consumerRegister] = metrics.GetOrRegisterCounter("sc:"+msc.ID+":func:"+consumerRegister, nil)
@@ -58,7 +60,7 @@ func NewMagmaSmartContract() *MagmaSmartContract {
 // Execute implements smartcontractinterface.SmartContractInterface.
 func (m *MagmaSmartContract) Execute(txn *tx.Transaction, call string, blob []byte, sci chain.StateContextI) (string, error) {
 	switch call {
-	// consumer's function list
+	// consumer's functions list
 	case consumerRegister:
 		return m.consumerRegister(txn, blob, sci)
 	case consumerSessionStart:
@@ -68,7 +70,7 @@ func (m *MagmaSmartContract) Execute(txn *tx.Transaction, call string, blob []by
 	case consumerUpdate:
 		return m.consumerUpdate(txn, blob, sci)
 
-	// provider's function list
+	// provider's functions list
 	case providerDataUsage:
 		return m.providerDataUsage(txn, blob, sci)
 	case providerRegister:
@@ -77,6 +79,12 @@ func (m *MagmaSmartContract) Execute(txn *tx.Transaction, call string, blob []by
 		return m.providerSessionInit(txn, blob, sci)
 	case providerUpdate:
 		return m.providerUpdate(txn, blob, sci)
+
+	// reward token pools functions list
+	case rewardPoolLock:
+		return m.rewardPoolLock(txn, blob, sci)
+	case rewardPoolUnlock:
+		return m.rewardPoolUnlock(txn, blob, sci)
 	}
 
 	return "", errInvalidFuncName

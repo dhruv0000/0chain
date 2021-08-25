@@ -30,13 +30,14 @@ func (m *Providers) add(scID string, item *zmc.Provider, db *store.Connection, s
 	return m.write(scID, item, db, sci)
 }
 
-func (m *Providers) copy() (list Providers) {
+func (m *Providers) copy() *Providers {
+	list := Providers{}
 	if m.Sorted != nil {
 		list.Sorted = make([]*zmc.Provider, len(m.Sorted))
 		copy(list.Sorted, m.Sorted)
 	}
 
-	return list
+	return &list
 }
 
 func (m *Providers) del(id string, db *store.Connection) (*zmc.Provider, error) {
@@ -155,13 +156,14 @@ func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection,
 		return errors.New(errCodeInternal, "provider invalid value").Wrap(errNilPointerValue)
 	}
 
-	list := m.copy()
-	if !list.hasEqual(item) { // check if an equal item already added
-		got, found := list.getByHost(item.Host)
+	var list *Providers
+	if !m.hasEqual(item) { // check if an equal item already added
+		got, found := m.getByHost(item.Host)
 		if found && item.ID != got.ID { // check if a host already registered
 			return errors.New(errCodeInternal, "provider host already registered: "+item.Host)
 		}
 
+		list = m.copy()
 		list.put(item) // add or replace
 		blob, err := json.Marshal(list.Sorted)
 		if err != nil {
@@ -171,16 +173,16 @@ func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection,
 			return errors.Wrap(errCodeInternal, "insert providers list failed", err)
 		}
 	}
-
 	if _, err := sci.InsertTrieNode(nodeUID(scID, providerType, item.ExtID), item); err != nil {
-		_ = db.Conn.Rollback()
 		return errors.Wrap(errCodeInternal, "insert provider failed", err)
 	}
 	if err := db.Commit(); err != nil {
 		return errors.Wrap(errCodeInternal, "commit changes failed", err)
 	}
+	if list != nil {
+		m.Sorted = list.Sorted
+	}
 
-	m.Sorted = list.Sorted
 
 	return nil
 }
