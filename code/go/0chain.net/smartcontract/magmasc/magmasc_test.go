@@ -11,13 +11,17 @@ import (
 	"testing"
 
 	"github.com/rcrowley/go-metrics"
+	"go.uber.org/zap"
 
 	chain "0chain.net/chaincore/chain/state"
 	"0chain.net/chaincore/smartcontractinterface"
 	tx "0chain.net/chaincore/transaction"
+	"0chain.net/core/logging"
 )
 
 func TestMain(m *testing.M) {
+	logging.Logger = zap.NewNop()
+
 	code := m.Run()
 
 	// clean up

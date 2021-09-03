@@ -128,3 +128,13 @@ func (m *MagmaSmartContract) Setup() error {
 
 	return nil
 }
+
+func (m *MagmaSmartContract) GetDB() *gorocksdb.TransactionDB {
+	return m.db
+}
+
+// SetDB sets provided database to the MagmaSmartContract.
+func (m *MagmaSmartContract) SetDB(db *gorocksdb.TransactionDB) {
+	m.db = db
+	store.AddPool(storeName, m.db)
+}

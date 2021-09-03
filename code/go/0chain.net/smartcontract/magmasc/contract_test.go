@@ -11,7 +11,6 @@ import (
 
 	chain "0chain.net/chaincore/chain/state"
 	tx "0chain.net/chaincore/transaction"
-	store "0chain.net/core/ememorystore"
 )
 
 func Test_MagmaSmartContract_acknowledgment(t *testing.T) {
@@ -302,7 +301,7 @@ func Test_MagmaSmartContract_allConsumers(t *testing.T) {
 	t.Parallel()
 
 	list, msc, sci := mockConsumers(), mockMagmaSmartContract(), mockStateContextI()
-	if err := list.add(msc.ID, mockConsumer(), store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, mockConsumer(), msc.db, sci); err != nil {
 		t.Fatalf("add() error: %v | want: %v", err, nil)
 	}
 
@@ -350,7 +349,7 @@ func Test_MagmaSmartContract_allProviders(t *testing.T) {
 	t.Parallel()
 
 	list, msc, sci := mockProviders(), mockMagmaSmartContract(), mockStateContextI()
-	if err := list.add(msc.ID, mockProvider(), store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, mockProvider(), msc.db, sci); err != nil {
 		t.Fatalf("add() error: %v | want: %v", err, nil)
 	}
 
@@ -593,12 +592,12 @@ func Test_MagmaSmartContract_consumerSessionStart(t *testing.T) {
 	ackn.TokenPool = &pool.TokenPool
 
 	consList := Consumers{}
-	if err := consList.add(msc.ID, ackn.Consumer, store.GetTransaction(msc.db), sci); err != nil {
+	if err := consList.add(msc.ID, ackn.Consumer, msc.db, sci); err != nil {
 		t.Fatalf("Consumers.add() error: %v | want: %v", err, nil)
 	}
 
 	provList := Providers{}
-	if err := provList.add(msc.ID, ackn.Provider, store.GetTransaction(msc.db), sci); err != nil {
+	if err := provList.add(msc.ID, ackn.Provider, msc.db, sci); err != nil {
 		t.Fatalf("Providers.add() error: %v | want: %v", err, nil)
 	}
 
@@ -653,12 +652,12 @@ func Test_MagmaSmartContract_consumerSessionStop(t *testing.T) {
 	}
 
 	consList := Consumers{}
-	if err := consList.add(msc.ID, ackn.Consumer, store.GetTransaction(msc.db), sci); err != nil {
+	if err := consList.add(msc.ID, ackn.Consumer, msc.db, sci); err != nil {
 		t.Fatalf("Consumers.add() error: %v | want: %v", err, nil)
 	}
 
 	provList := Providers{}
-	if err := provList.add(msc.ID, ackn.Provider, store.GetTransaction(msc.db), sci); err != nil {
+	if err := provList.add(msc.ID, ackn.Provider, msc.db, sci); err != nil {
 		t.Fatalf("Providers.add() error: %v | want: %v", err, nil)
 	}
 
@@ -727,7 +726,7 @@ func Test_MagmaSmartContract_consumerUpdate(t *testing.T) {
 
 	msc, sci := mockMagmaSmartContract(), mockStateContextI()
 	cons, list := mockConsumer(), Consumers{}
-	if err := list.add(msc.ID, cons, store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, cons, msc.db, sci); err != nil {
 		t.Fatalf("Providers.add() error: %v | want: %v", err, nil)
 	}
 
@@ -781,7 +780,7 @@ func Test_MagmaSmartContract_providerDataUsage(t *testing.T) {
 	}
 
 	list := Providers{}
-	if err := list.add(msc.ID, ackn.Provider, store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, ackn.Provider, msc.db, sci); err != nil {
 		t.Fatalf("Providers.add() error: %v | want: %v", err, nil)
 	}
 
@@ -1018,12 +1017,12 @@ func TestMagmaSmartContract_providerSessionInit(t *testing.T) {
 	blob := ackn.Encode()
 
 	consList := Consumers{}
-	if err := consList.add(msc.ID, ackn.Consumer, store.GetTransaction(msc.db), sci); err != nil {
+	if err := consList.add(msc.ID, ackn.Consumer, msc.db, sci); err != nil {
 		t.Fatalf("Consumers.add() error: %v | want: %v", err, nil)
 	}
 
 	provList := Providers{}
-	if err := provList.add(msc.ID, ackn.Provider, store.GetTransaction(msc.db), sci); err != nil {
+	if err := provList.add(msc.ID, ackn.Provider, msc.db, sci); err != nil {
 		t.Fatalf("Providers.add() error: %v | want: %v", err, nil)
 	}
 
@@ -1073,7 +1072,7 @@ func Test_MagmaSmartContract_providerUpdate(t *testing.T) {
 	list, msc, sci := Providers{}, mockMagmaSmartContract(), mockStateContextI()
 
 	prov := mockProvider()
-	if err := list.add(msc.ID, prov, store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, prov, msc.db, sci); err != nil {
 		t.Fatalf("add() error: %v | want: %v", err, nil)
 	}
 

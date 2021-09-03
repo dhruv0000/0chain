@@ -7,7 +7,6 @@ import (
 	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
 
 	chain "0chain.net/chaincore/chain/state"
-	store "0chain.net/core/ememorystore"
 )
 
 func Test_Providers_add(t *testing.T) {
@@ -58,7 +57,7 @@ func Test_Providers_add(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// do not use parallel running to avoid detect race conditions because of
 			// everything is happening in a single smart contract so there is only one thread
-			err := test.list.add(test.msc.ID, test.prov, store.GetTransaction(test.msc.db), test.sci)
+			err := test.list.add(test.msc.ID, test.prov, msc.db, test.sci)
 			if (err != nil) != test.error {
 				t.Errorf("add() error: %v | want: %v", err, test.error)
 			}
@@ -105,7 +104,7 @@ func Test_Providers_del(t *testing.T) {
 	msc, sci := mockMagmaSmartContract(), mockStateContextI()
 
 	prov, list := mockProvider(), &Providers{}
-	if err := list.add(msc.ID, prov, store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, prov, msc.db, sci); err != nil {
 		t.Fatalf("add() error: %v | want: %v", err, nil)
 	}
 
@@ -140,7 +139,7 @@ func Test_Providers_del(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// do not use parallel running to avoid detect race conditions because of
 			// everything is happening in a single smart contract so there is only one thread
-			got, err := test.list.del(test.prov.ExtID, store.GetTransaction(test.msc.db))
+			got, err := test.list.del(test.prov.ExtID, msc.db)
 			if (err != nil) != test.error {
 				t.Errorf("del() error: %v | want: %v", err, test.error)
 				return
@@ -220,7 +219,7 @@ func Test_Providers_delByIndex(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// do not use parallel running
 			// the particular order of tests is important
-			got, err := test.list.delByIndex(test.idx, store.GetTransaction(test.msc.db))
+			got, err := test.list.delByIndex(test.idx, msc.db)
 			if (err != nil) != test.error {
 				t.Errorf("delByIndex() error: %v | want: %v", err, test.error)
 				return
@@ -514,7 +513,7 @@ func Test_Providers_write(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// do not use parallel running to avoid detect race conditions because of
 			// everything is happening in a single smart contract so there is only one thread
-			err := test.list.write(test.msc.ID, test.prov, store.GetTransaction(test.msc.db), test.sci)
+			err := test.list.write(test.msc.ID, test.prov, msc.db, test.sci)
 			if (err != nil) != test.error {
 				t.Errorf("write() error: %v | want: %v", err, test.error)
 			}
@@ -526,7 +525,7 @@ func Test_providersFetch(t *testing.T) {
 	t.Parallel()
 
 	list, msc, sci := mockProviders(), mockMagmaSmartContract(), mockStateContextI()
-	if err := list.add(msc.ID, mockProvider(), store.GetTransaction(msc.db), sci); err != nil {
+	if err := list.add(msc.ID, mockProvider(), msc.db, sci); err != nil {
 		t.Fatalf("add() error: %v | want: %v", err, nil)
 	}
 
@@ -558,7 +557,7 @@ func Test_providersFetch(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := providersFetch(test.id, store.GetTransaction(test.msc.db))
+			got, err := providersFetch(test.id, msc.db)
 			if err == nil && !reflect.DeepEqual(got, test.want) {
 				t.Errorf("providersFetch() got: %#v | want: %#v", got, test.want)
 				return

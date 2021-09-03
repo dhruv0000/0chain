@@ -11,7 +11,6 @@ import (
 
 	chain "0chain.net/chaincore/chain/state"
 	tx "0chain.net/chaincore/transaction"
-	store "0chain.net/core/ememorystore"
 )
 
 // acknowledgment tries to extract Acknowledgment with given id param.
@@ -72,7 +71,7 @@ func (m *MagmaSmartContract) acknowledgmentExist(_ context.Context, vals url.Val
 // Returns all registered Consumer's nodes stores in
 // provided state.StateContextI with AllConsumersKey.
 func (m *MagmaSmartContract) allConsumers(context.Context, url.Values, chain.StateContextI) (interface{}, error) {
-	consumers, err := consumersFetch(AllConsumersKey, store.GetTransaction(m.db))
+	consumers, err := consumersFetch(AllConsumersKey, m.db)
 	if err != nil {
 		return nil, errors.Wrap(errCodeFetchData, "fetch consumers list failed", err)
 	}
@@ -84,7 +83,7 @@ func (m *MagmaSmartContract) allConsumers(context.Context, url.Values, chain.Sta
 // Returns all registered Provider's nodes stores in
 // provided state.StateContextI with AllProvidersKey.
 func (m *MagmaSmartContract) allProviders(context.Context, url.Values, chain.StateContextI) (interface{}, error) {
-	providers, err := providersFetch(AllProvidersKey, store.GetTransaction(m.db))
+	providers, err := providersFetch(AllProvidersKey, m.db)
 	if err != nil {
 		return nil, errors.Wrap(errCodeFetchData, "fetch providers list failed", err)
 	}
@@ -102,7 +101,7 @@ func (m *MagmaSmartContract) consumerExist(_ context.Context, vals url.Values, s
 // consumerFetch tries to extract registered consumer
 // with given external id param and returns raw consumer data.
 func (m *MagmaSmartContract) consumerFetch(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
-	return consumerFetch(m.ID, vals.Get("ext_id"), store.GetTransaction(m.db), sci)
+	return consumerFetch(m.ID, vals.Get("ext_id"), m.db, sci)
 }
 
 // consumerRegister allows registering consumer node in the blockchain
@@ -113,14 +112,13 @@ func (m *MagmaSmartContract) consumerRegister(txn *tx.Transaction, blob []byte, 
 		return "", errors.Wrap(errCodeConsumerReg, "decode consumer data failed", err)
 	}
 
-	db := store.GetTransaction(m.db)
-	list, err := consumersFetch(AllConsumersKey, db)
+	list, err := consumersFetch(AllConsumersKey, m.db)
 	if err != nil {
 		return "", errors.Wrap(errCodeConsumerReg, "fetch consumers list failed", err)
 	}
 
 	consumer.ID = txn.ClientID
-	if err = list.add(m.ID, consumer, db, sci); err != nil {
+	if err = list.add(m.ID, consumer, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeConsumerReg, "register consumer failed", err)
 	}
 
@@ -207,7 +205,7 @@ func (m *MagmaSmartContract) consumerUpdate(txn *tx.Transaction, blob []byte, sc
 		return "", errors.Wrap(errCodeConsumerUpdate, "decode consumer data failed", err)
 	}
 
-	got, err := consumerFetch(m.ID, consumer.ExtID, store.GetTransaction(m.db), sci)
+	got, err := consumerFetch(m.ID, consumer.ExtID, m.db, sci)
 	if err != nil {
 		return "", errors.Wrap(errCodeSessionStop, "fetch consumer failed", err)
 	}
@@ -215,14 +213,13 @@ func (m *MagmaSmartContract) consumerUpdate(txn *tx.Transaction, blob []byte, sc
 		return "", errors.Wrap(errCodeSessionStop, "check owner id failed", err)
 	}
 
-	db := store.GetTransaction(m.db)
-	list, err := consumersFetch(AllConsumersKey, db)
+	list, err := consumersFetch(AllConsumersKey, m.db)
 	if err != nil {
 		return "", errors.Wrap(errCodeConsumerUpdate, "fetch consumer list failed", err)
 	}
 
 	consumer.ID = txn.ClientID
-	if err = list.write(m.ID, consumer, db, sci); err != nil {
+	if err = list.write(m.ID, consumer, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeConsumerUpdate, "update consumer list failed", err)
 	}
 
@@ -247,7 +244,7 @@ func (m *MagmaSmartContract) providerDataUsage(txn *tx.Transaction, blob []byte,
 		return "", errors.Wrap(errCodeDataUsage, "session already completed", err)
 	}
 
-	provider, err := providerFetch(m.ID, ackn.Provider.ExtID, store.GetTransaction(m.db), sci)
+	provider, err := providerFetch(m.ID, ackn.Provider.ExtID, m.db, sci)
 	if err != nil {
 		return "", errors.Wrap(errCodeDataUsage, "fetch provider failed", err)
 	}
@@ -282,7 +279,7 @@ func (m *MagmaSmartContract) providerExist(_ context.Context, vals url.Values, s
 // providerFetch tries to extract registered provider
 // with given external id param and returns raw provider data.
 func (m *MagmaSmartContract) providerFetch(_ context.Context, vals url.Values, sci chain.StateContextI) (interface{}, error) {
-	return providerFetch(m.ID, vals.Get("ext_id"), store.GetTransaction(m.db), sci)
+	return providerFetch(m.ID, vals.Get("ext_id"), m.db, sci)
 }
 
 // providerRegister allows registering provider node in the blockchain
@@ -293,14 +290,13 @@ func (m *MagmaSmartContract) providerRegister(txn *tx.Transaction, blob []byte, 
 		return "", errors.Wrap(errCodeProviderReg, "decode provider data failed", err)
 	}
 
-	db := store.GetTransaction(m.db)
-	list, err := providersFetch(AllProvidersKey, db)
+	list, err := providersFetch(AllProvidersKey, m.db)
 	if err != nil {
 		return "", errors.Wrap(errCodeProviderReg, "fetch providers list failed", err)
 	}
 
 	provider.ID = txn.ClientID
-	if err = list.add(m.ID, provider, db, sci); err != nil {
+	if err = list.add(m.ID, provider, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeProviderReg, "register provider failed", err)
 	}
 
@@ -319,7 +315,7 @@ func (m *MagmaSmartContract) providerSessionInit(txn *tx.Transaction, blob []byt
 		return "", errors.Wrap(errCodeSessionInit, "decode acknowledgment data failed", err)
 	}
 
-	if req.Provider, err = providerFetch(m.ID, req.Provider.ExtID, store.GetTransaction(m.db), sci); err != nil {
+	if req.Provider, err = providerFetch(m.ID, req.Provider.ExtID, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeSessionInit, "fetch provider failed", err)
 	}
 	if req.Provider.ID != txn.ClientID {
@@ -329,7 +325,7 @@ func (m *MagmaSmartContract) providerSessionInit(txn *tx.Transaction, blob []byt
 		return "", errors.Wrap(errCodeSessionInit, "invalid provider terms", err)
 	}
 
-	req.Consumer, err = consumerFetch(m.ID, req.Consumer.ExtID, store.GetTransaction(m.db), sci)
+	req.Consumer, err = consumerFetch(m.ID, req.Consumer.ExtID, m.db, sci)
 	if err != nil {
 		return "", errors.Wrap(errCodeSessionInit, "fetch consumer failed", err)
 	}
@@ -355,7 +351,7 @@ func (m *MagmaSmartContract) providerUpdate(txn *tx.Transaction, blob []byte, sc
 		return "", errors.Wrap(errCodeProviderUpdate, "decode provider data failed", err)
 	}
 
-	got, err := providerFetch(m.ID, provider.ExtID, store.GetTransaction(m.db), sci)
+	got, err := providerFetch(m.ID, provider.ExtID, m.db, sci)
 	if err != nil {
 		return "", errors.Wrap(errCodeProviderUpdate, "fetch provider failed", err)
 	}
@@ -363,14 +359,13 @@ func (m *MagmaSmartContract) providerUpdate(txn *tx.Transaction, blob []byte, sc
 		return "", errors.Wrap(errCodeProviderUpdate, "check owner id failed", err)
 	}
 
-	db := store.GetTransaction(m.db)
-	list, err := providersFetch(AllProvidersKey, db)
+	list, err := providersFetch(AllProvidersKey, m.db)
 	if err != nil {
 		return "", errors.Wrap(errCodeProviderUpdate, "fetch providers list failed", err)
 	}
 
 	provider.ID = txn.ClientID
-	if err = list.write(m.ID, provider, db, sci); err != nil {
+	if err = list.write(m.ID, provider, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeProviderUpdate, "update providers list failed", err)
 	}
 

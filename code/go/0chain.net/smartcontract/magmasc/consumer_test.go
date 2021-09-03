@@ -7,7 +7,6 @@ import (
 	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
 
 	chain "0chain.net/chaincore/chain/state"
-	store "0chain.net/core/ememorystore"
 )
 
 func Test_consumerFetch(t *testing.T) {
@@ -58,7 +57,7 @@ func Test_consumerFetch(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := consumerFetch(Address, test.id, store.GetTransaction(msc.db), test.sci)
+			got, err := consumerFetch(Address, test.id, msc.db, test.sci)
 			if err == nil && !reflect.DeepEqual(got, test.want) {
 				t.Errorf("consumerFetch() got: %#v | want: %#v", err, test.want)
 				return

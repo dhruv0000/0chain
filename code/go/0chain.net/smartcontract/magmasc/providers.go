@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/0chain/gorocksdb"
 	"github.com/0chain/gosdk/zmagmacore/errors"
 	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
 
@@ -19,12 +20,12 @@ type (
 	}
 )
 
-func (m *Providers) add(scID string, item *zmc.Provider, db *store.Connection, sci chain.StateContextI) error {
+func (m *Providers) add(scID string, item *zmc.Provider, db *gorocksdb.TransactionDB, sci chain.StateContextI) error {
 	if item == nil {
 		return errors.New(errCodeInternal, "provider invalid value").Wrap(errNilPointerValue)
 	}
 	if got, _ := sci.GetTrieNode(nodeUID(scID, providerType, item.ExtID)); got != nil {
-		return errors.New(errCodeInternal, "provider already registered")
+		return errors.New(errCodeInternal, "provider already registered: "+item.ExtID)
 	}
 
 	return m.write(scID, item, db, sci)
@@ -39,7 +40,7 @@ func (m *Providers) copy() (list Providers) {
 	return list
 }
 
-func (m *Providers) del(id string, db *store.Connection) (*zmc.Provider, error) {
+func (m *Providers) del(id string, db *gorocksdb.TransactionDB) (*zmc.Provider, error) {
 	if idx, found := m.getIndex(id); found {
 		return m.delByIndex(idx, db)
 	}
@@ -47,7 +48,7 @@ func (m *Providers) del(id string, db *store.Connection) (*zmc.Provider, error) 
 	return nil, errors.New(errCodeInternal, "value not present")
 }
 
-func (m *Providers) delByIndex(idx int, db *store.Connection) (*zmc.Provider, error) {
+func (m *Providers) delByIndex(idx int, db *gorocksdb.TransactionDB) (*zmc.Provider, error) {
 	if idx >= len(m.Sorted) {
 		return nil, errors.New(errCodeInternal, "index out of range")
 	}
@@ -60,16 +61,18 @@ func (m *Providers) delByIndex(idx int, db *store.Connection) (*zmc.Provider, er
 	if err != nil {
 		return nil, errors.Wrap(errCodeInternal, "encode providers list failed", err)
 	}
-	if err = db.Conn.Put([]byte(AllProvidersKey), blob); err != nil {
+
+	tx := store.GetTransaction(db)
+	if err = tx.Conn.Put([]byte(AllProvidersKey), blob); err != nil {
 		return nil, errors.Wrap(errCodeInternal, "insert providers list failed", err)
 	}
-	if err = db.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return nil, errors.Wrap(errCodeInternal, "commit changes failed", err)
 	}
 
 	m.Sorted = list.Sorted
 
-	return &item, nil
+	return &item, tx.Commit()
 }
 
 func (m *Providers) hasEqual(item *zmc.Provider) bool {
@@ -150,9 +153,12 @@ func (m *Providers) put(item *zmc.Provider) (int, bool) {
 	return idx, true // inserted
 }
 
-func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection, sci chain.StateContextI) error {
+func (m *Providers) write(scID string, item *zmc.Provider, db *gorocksdb.TransactionDB, sci chain.StateContextI) error {
 	if item == nil {
 		return errors.New(errCodeInternal, "provider invalid value").Wrap(errNilPointerValue)
+	}
+	if _, err := sci.InsertTrieNode(nodeUID(scID, providerType, item.ExtID), item); err != nil {
+		return errors.Wrap(errCodeInternal, "insert provider failed", err)
 	}
 
 	list := m.copy()
@@ -167,17 +173,14 @@ func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection,
 		if err != nil {
 			return errors.Wrap(errCodeInternal, "encode providers list failed", err)
 		}
-		if err = db.Conn.Put([]byte(AllProvidersKey), blob); err != nil {
+
+		tx := store.GetTransaction(db)
+		if err = tx.Conn.Put([]byte(AllProvidersKey), blob); err != nil {
 			return errors.Wrap(errCodeInternal, "insert providers list failed", err)
 		}
-	}
-
-	if _, err := sci.InsertTrieNode(nodeUID(scID, providerType, item.ExtID), item); err != nil {
-		_ = db.Conn.Rollback()
-		return errors.Wrap(errCodeInternal, "insert provider failed", err)
-	}
-	if err := db.Commit(); err != nil {
-		return errors.Wrap(errCodeInternal, "commit changes failed", err)
+		if err = tx.Commit(); err != nil {
+			return errors.Wrap(errCodeInternal, "commit changes failed", err)
+		}
 	}
 
 	m.Sorted = list.Sorted
@@ -186,10 +189,11 @@ func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection,
 }
 
 // providersFetch extracts all providers stored in memory data store with given id.
-func providersFetch(id string, db *store.Connection) (*Providers, error) {
+func providersFetch(id string, db *gorocksdb.TransactionDB) (*Providers, error) {
 	list := &Providers{}
 
-	buf, err := db.Conn.Get(db.ReadOptions, []byte(id))
+	tx := store.GetTransaction(db)
+	buf, err := tx.Conn.Get(tx.ReadOptions, []byte(id))
 	if err != nil {
 		return list, errors.Wrap(errCodeInternal, "get providers list failed", err)
 	}
@@ -202,5 +206,5 @@ func providersFetch(id string, db *store.Connection) (*Providers, error) {
 		}
 	}
 
-	return list, nil
+	return list, tx.Commit()
 }

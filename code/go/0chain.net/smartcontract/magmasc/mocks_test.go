@@ -16,6 +16,7 @@ import (
 	magma "github.com/magma/augmented-networks/accounting/protos"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 
 	chain "0chain.net/chaincore/chain/state"
@@ -68,17 +69,16 @@ func (m *mockInvalidJson) Encode() []byte {
 }
 
 func mockAcknowledgment() *zmc.Acknowledgment {
-	now := time.Now().Format(time.RFC3339Nano)
-	apid := "id:access_point:" + now
-
+	apid := "id:access_point:" + randString(16)
+	sessID := "id:session:" + randString(16)
 	return &zmc.Acknowledgment{
-		SessionID:     "id:session:" + now,
+		SessionID:     sessID,
 		AccessPointID: apid,
 		Billing: zmc.Billing{
 			DataUsage: zmc.DataUsage{
 				DownloadBytes: 3 * million,
 				UploadBytes:   2 * million,
-				SessionID:     "id:session:" + now,
+				SessionID:     sessID,
 				SessionTime:   1 * 60, // 1 minute
 			},
 		},
@@ -105,13 +105,12 @@ func mockAcknowledgment() *zmc.Acknowledgment {
 }
 
 func mockConsumer() *zmc.Consumer {
-	now := time.Now()
-	bin, _ := now.MarshalBinary()
-	hash := sha3.Sum256(bin)
+	id := randString(32)
+	hash := sha3.Sum256([]byte(id))
 	return &zmc.Consumer{
-		ID:    "id:consumer:" + hex.EncodeToString(hash[:]),
-		ExtID: "id:consumer:external:" + now.Format(time.RFC3339Nano),
-		Host:  "host.consumer.local:8010",
+		ID:    hex.EncodeToString(hash[:]),
+		ExtID: "id:consumer:external:" + id,
+		Host:  "host.consumer.local:" + id,
 	}
 }
 
@@ -136,6 +135,22 @@ func mockSmartContractI() *mockSmartContract {
 
 	smartContract := mockSmartContract{ID: msc.ID, SC: msc}
 	smartContract.On("Execute", argTxn, argStr, argBlob, argSci).Return(
+		func(txn *tx.Transaction, call string, blob []byte, sci chain.StateContextI) string {
+			if _, err := smartContract.SC.Execute(txn, call, blob, sci); errors.Is(err, errInvalidFuncName) {
+				return ""
+			}
+			return call
+		},
+		func(txn *tx.Transaction, call string, blob []byte, sci chain.StateContextI) error {
+			if _, err := smartContract.SC.Execute(txn, call, blob, sci); errors.Is(err, errInvalidFuncName) {
+				return err
+			}
+			return nil
+		},
+	)
+
+	// mocking with real state.StateContext
+	smartContract.On("Execute", argTxn, argStr, argBlob, mock.AnythingOfType("*state.StateContext")).Return(
 		func(txn *tx.Transaction, call string, blob []byte, sci chain.StateContextI) string {
 			if _, err := smartContract.SC.Execute(txn, call, blob, sci); errors.Is(err, errInvalidFuncName) {
 				return ""
@@ -179,13 +194,12 @@ func mockMagmaSmartContract() *MagmaSmartContract {
 }
 
 func mockProvider() *zmc.Provider {
-	now := time.Now()
-	bin, _ := now.MarshalBinary()
-	hash := sha3.Sum256(bin)
+	id := randString(32)
+	hash := sha3.Sum256([]byte(id))
 	return &zmc.Provider{
-		ID:    "id:provider:" + hex.EncodeToString(hash[:]),
-		ExtID: "id:provider:external:" + now.Format(time.RFC3339Nano),
-		Host:  "host.provider.local:8020",
+		ID:    hex.EncodeToString(hash[:]),
+		ExtID: "id:provider:external:" + id,
+		Host:  "host.provider.local:" + id,
 	}
 }
 
@@ -333,4 +347,12 @@ func mockTokenPool() *tokenPool {
 	pool.Balance = 1000
 
 	return pool
+}
+
+func mockState(bal state.Balance, t require.TestingT) *state.State {
+	balance := &state.State{}
+	err := balance.SetTxnHash("0000000000000000000000000000000000000000000000000000000000000000")
+	require.NoError(t, err)
+	balance.Balance = bal
+	return balance
 }

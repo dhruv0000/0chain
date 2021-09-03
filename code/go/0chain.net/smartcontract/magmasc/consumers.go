@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/0chain/gorocksdb"
 	"github.com/0chain/gosdk/zmagmacore/errors"
 	zmc "github.com/0chain/gosdk/zmagmacore/magmasc"
 
@@ -19,12 +20,12 @@ type (
 	}
 )
 
-func (m *Consumers) add(scID string, item *zmc.Consumer, db *store.Connection, sci chain.StateContextI) error {
+func (m *Consumers) add(scID string, item *zmc.Consumer, db *gorocksdb.TransactionDB, sci chain.StateContextI) error {
 	if item == nil {
 		return errors.New(errCodeInternal, "consumer invalid value").Wrap(errNilPointerValue)
 	}
 	if got, _ := sci.GetTrieNode(nodeUID(scID, consumerType, item.ExtID)); got != nil {
-		return errors.New(errCodeInternal, "consumer already registered")
+		return errors.New(errCodeInternal, "consumer already registered: "+item.ExtID)
 	}
 
 	return m.write(scID, item, db, sci)
@@ -39,7 +40,7 @@ func (m *Consumers) copy() (list Consumers) {
 	return list
 }
 
-func (m *Consumers) del(id string, db *store.Connection) (*zmc.Consumer, error) {
+func (m *Consumers) del(id string, db *gorocksdb.TransactionDB) (*zmc.Consumer, error) {
 	if idx, found := m.getIndex(id); found {
 		return m.delByIndex(idx, db)
 	}
@@ -47,7 +48,7 @@ func (m *Consumers) del(id string, db *store.Connection) (*zmc.Consumer, error) 
 	return nil, errors.New(errCodeInternal, "value not present")
 }
 
-func (m *Consumers) delByIndex(idx int, db *store.Connection) (*zmc.Consumer, error) {
+func (m *Consumers) delByIndex(idx int, db *gorocksdb.TransactionDB) (*zmc.Consumer, error) {
 	if idx >= len(m.Sorted) {
 		return nil, errors.New(errCodeInternal, "index out of range")
 	}
@@ -60,10 +61,12 @@ func (m *Consumers) delByIndex(idx int, db *store.Connection) (*zmc.Consumer, er
 	if err != nil {
 		return nil, errors.Wrap(errCodeInternal, "encode consumers list failed", err)
 	}
-	if err = db.Conn.Put([]byte(AllConsumersKey), blob); err != nil {
+
+	tx := store.GetTransaction(db)
+	if err = tx.Conn.Put([]byte(AllConsumersKey), blob); err != nil {
 		return nil, errors.Wrap(errCodeInternal, "insert consumers list failed", err)
 	}
-	if err = db.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return nil, errors.Wrap(errCodeInternal, "commit changes failed", err)
 	}
 
@@ -150,9 +153,12 @@ func (m *Consumers) put(item *zmc.Consumer) (int, bool) {
 	return idx, true // inserted
 }
 
-func (m *Consumers) write(scID string, item *zmc.Consumer, db *store.Connection, sci chain.StateContextI) error {
+func (m *Consumers) write(scID string, item *zmc.Consumer, db *gorocksdb.TransactionDB, sci chain.StateContextI) error {
 	if item == nil {
 		return errors.New(errCodeInternal, "consumer invalid value").Wrap(errNilPointerValue)
+	}
+	if _, err := sci.InsertTrieNode(nodeUID(scID, consumerType, item.ExtID), item); err != nil {
+		return errors.Wrap(errCodeInternal, "insert consumer failed", err)
 	}
 
 	list := m.copy()
@@ -167,17 +173,14 @@ func (m *Consumers) write(scID string, item *zmc.Consumer, db *store.Connection,
 		if err != nil {
 			return errors.Wrap(errCodeInternal, "encode consumers list failed", err)
 		}
-		if err = db.Conn.Put([]byte(AllConsumersKey), blob); err != nil {
+
+		tx := store.GetTransaction(db)
+		if err = tx.Conn.Put([]byte(AllConsumersKey), blob); err != nil {
 			return errors.Wrap(errCodeInternal, "insert consumers list failed", err)
 		}
-	}
-
-	if _, err := sci.InsertTrieNode(nodeUID(scID, consumerType, item.ExtID), item); err != nil {
-		_ = db.Conn.Rollback()
-		return errors.Wrap(errCodeInternal, "insert consumer failed", err)
-	}
-	if err := db.Commit(); err != nil {
-		return errors.Wrap(errCodeInternal, "commit changes failed", err)
+		if err = tx.Commit(); err != nil {
+			return errors.Wrap(errCodeInternal, "commit changes failed", err)
+		}
 	}
 
 	m.Sorted = list.Sorted
@@ -186,10 +189,11 @@ func (m *Consumers) write(scID string, item *zmc.Consumer, db *store.Connection,
 }
 
 // consumersFetch extracts all consumers stored in memory data store with given id.
-func consumersFetch(id string, db *store.Connection) (*Consumers, error) {
+func consumersFetch(id string, db *gorocksdb.TransactionDB) (*Consumers, error) {
 	list := &Consumers{}
 
-	buf, err := db.Conn.Get(db.ReadOptions, []byte(id))
+	tx := store.GetTransaction(db)
+	buf, err := tx.Conn.Get(tx.ReadOptions, []byte(id))
 	if err != nil {
 		return list, errors.Wrap(errCodeInternal, "get consumers list failed", err)
 	}
@@ -202,5 +206,5 @@ func consumersFetch(id string, db *store.Connection) (*Consumers, error) {
 		}
 	}
 
-	return list, nil
+	return list, tx.Commit()
 }
