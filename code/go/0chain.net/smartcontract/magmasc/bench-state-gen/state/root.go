@@ -16,11 +16,13 @@ func saveRoot(root []byte, db *gorocksdb.TransactionDB) error {
 		_ = conn.Conn.Rollback()
 		return err
 	}
+
 	return conn.Commit()
 }
 
 func getRoot(db *gorocksdb.TransactionDB) ([]byte, error) {
 	conn := store.GetTransaction(db)
+
 	sl, err := conn.Conn.Get(conn.ReadOptions, []byte(rootKey))
 	if err != nil {
 		_ = conn.Conn.Rollback()

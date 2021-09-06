@@ -9,8 +9,8 @@ import (
 
 func RandomConsumers(num int) []*zmc.Consumer {
 	consumers := make([]*zmc.Consumer, num)
-	for ind := range consumers {
-		consumers[ind] = randomConsumer()
+	for idx := range consumers {
+		consumers[idx] = randomConsumer()
 	}
 	return consumers
 }
@@ -27,8 +27,8 @@ func randomConsumer() *zmc.Consumer {
 
 func RandomProviders(num int) []*zmc.Provider {
 	provider := make([]*zmc.Provider, num)
-	for ind := range provider {
-		provider[ind] = randomProvider()
+	for idx := range provider {
+		provider[idx] = randomProvider()
 	}
 	return provider
 }

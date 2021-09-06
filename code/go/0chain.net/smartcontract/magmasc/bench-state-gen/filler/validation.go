@@ -14,6 +14,44 @@ import (
 	"0chain.net/smartcontract/magmasc"
 )
 
+func CounterSessionsActive(sc *magmasc.MagmaSmartContract, sci chain.StateContextI) (int, error) {
+	nas, handler := 0, sc.RestHandlers["/acknowledgmentAccepted"]
+	for i := 0; ; i++ {
+		val := url.Values{}
+		val.Set("id", getSessionName(i, true))
+		output, err := handler(nil, val, sci)
+		if err != nil && errors.Is(err, util.ErrValueNotPresent) {
+			break
+		} else if err != nil {
+			return nas, err
+		}
+		if output.(*zmc.Acknowledgment).Billing.CompletedAt == 0 {
+			nas++
+		}
+	}
+
+	return nas, nil
+}
+
+func CounterSessionsInactive(sc *magmasc.MagmaSmartContract, sci chain.StateContextI) (int, error) {
+	nis, handler := 0, sc.RestHandlers["/acknowledgmentAccepted"]
+	for i := 0; ; i++ {
+		val := url.Values{}
+		val.Set("id", getSessionName(i, false))
+		output, err := handler(nil, val, sci)
+		if err != nil && errors.Is(err, util.ErrValueNotPresent) {
+			break
+		} else if err != nil {
+			return nis, err
+		}
+		if output.(*zmc.Acknowledgment).Billing.CompletedAt != 0 {
+			nis++
+		}
+	}
+
+	return nis, nil
+}
+
 func (sf *Filler) validate(consumers []*zmc.Consumer, providers []*zmc.Provider, numActiveSessions, numInactiveSessions int) error {
 	if err := sf.validateRegisteredConsumers(consumers); err != nil {
 		return err
@@ -32,7 +70,7 @@ func (sf *Filler) validate(consumers []*zmc.Consumer, providers []*zmc.Provider,
 }
 
 func (sf *Filler) validateRegisteredConsumers(consumers []*zmc.Consumer) error {
-	handlAll := sf.sc.RestHandlers["/allConsumers"]
+	handlAll := sf.msc.RestHandlers["/allConsumers"]
 	if output, err := handlAll(nil, nil, nil); err != nil {
 		return err
 	} else {
@@ -42,7 +80,7 @@ func (sf *Filler) validateRegisteredConsumers(consumers []*zmc.Consumer) error {
 		}
 	}
 
-	handlOne := sf.sc.RestHandlers["/consumerFetch"]
+	handlOne := sf.msc.RestHandlers["/consumerFetch"]
 	for ind, cons := range consumers {
 		vals := url.Values{}
 		vals.Set("ext_id", cons.ExtID)
@@ -61,22 +99,22 @@ func (sf *Filler) validateRegisteredConsumers(consumers []*zmc.Consumer) error {
 }
 
 func (sf *Filler) validateRegisteredProviders(providers []*zmc.Provider) error {
-	handlAll := sf.sc.RestHandlers["/allProviders"]
-	if output, err := handlAll(nil, nil, nil); err != nil {
+	all := sf.msc.RestHandlers["/allProviders"]
+	if out, err := all(nil, nil, nil); err != nil {
 		return err
 	} else {
-		outputProviders := output.([]*zmc.Provider)
-		if len(outputProviders) != len(providers) {
-			return fmt.Errorf("validating providers registration failed: providers registered %d; expected %d", len(outputProviders), len(providers))
+		outProviders := out.([]*zmc.Provider)
+		if len(outProviders) != len(providers) {
+			return fmt.Errorf("validating providers registration failed: providers registered %d; expected %d", len(outProviders), len(providers))
 		}
 	}
 
-	handlOne := sf.sc.RestHandlers["/providerFetch"]
+	one := sf.msc.RestHandlers["/providerFetch"]
 	for ind, prov := range providers {
 		vals := url.Values{}
 		vals.Set("ext_id", prov.ExtID)
 
-		if output, err := handlOne(nil, vals, sf.sci); err != nil {
+		if output, err := one(nil, vals, sf.sci); err != nil {
 			return fmt.Errorf("got error while making '/providerFetch' with ext_id '%s' and ind '%d': %w", prov.ExtID, ind, err)
 		} else {
 			outputProvider := output.(*zmc.Provider)
@@ -89,57 +127,24 @@ func (sf *Filler) validateRegisteredProviders(providers []*zmc.Provider) error {
 	return nil
 }
 
-func (sf *Filler) validateSessions(activeNum, inactiveNum int) error {
-	activeInStateNum, inactiveInStateNum, err := countSessions(sf.sc, sf.sci)
+func (sf *Filler) validateSessions(nas, nis int) error {
+	nasInStateNum, err := CounterSessionsActive(sf.msc, sf.sci)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Sessions in state: %d active, %d inactive \n", activeInStateNum, inactiveInStateNum)
-	if activeInStateNum != activeNum {
-		return fmt.Errorf("active sessions missmatch: %d active in state; %d expected", activeInStateNum, activeNum)
+
+	nisInStateNum, err := CounterSessionsInactive(sf.msc, sf.sci)
+	if err != nil {
+		return err
 	}
-	if inactiveInStateNum != inactiveNum {
-		return fmt.Errorf("inactive sessions missmatch: %d in state; %d expected", inactiveInStateNum, inactiveNum)
+
+	fmt.Printf("Sessions in state: %d active, %d inactive \n", nasInStateNum, nisInStateNum)
+	if nasInStateNum != nas {
+		return fmt.Errorf("active sessions missmatch: %d active in state; %d expected", nasInStateNum, nas)
+	}
+	if nisInStateNum != nis {
+		return fmt.Errorf("inactive sessions missmatch: %d in state; %d expected", nisInStateNum, nis)
 	}
 
 	return nil
-}
-
-func countSessions(sc *magmasc.MagmaSmartContract, sci chain.StateContextI) (act, inact int, err error) {
-	handl := sc.RestHandlers["/acknowledgmentAccepted"]
-	for i := 0; ; i++ {
-		val := url.Values{}
-		val.Set("id", getSessionName(i, true))
-		output, err := handl(nil, val, sci)
-		if err != nil && errors.Is(err, util.ErrValueNotPresent) {
-			break
-		} else if err != nil {
-			return 0, 0, err
-		}
-		outputAckn := output.(*zmc.Acknowledgment)
-		if outputAckn.Billing.CompletedAt == 0 {
-			act++
-		} else {
-			inact++
-		}
-	}
-
-	for i := 0; ; i++ {
-		val := url.Values{}
-		val.Set("id", getSessionName(i, false))
-		output, err := handl(nil, val, sci)
-		if err != nil && errors.Is(err, util.ErrValueNotPresent) {
-			break
-		} else if err != nil {
-			return 0, 0, err
-		}
-		outputAckn := output.(*zmc.Acknowledgment)
-		if outputAckn.Billing.CompletedAt == 0 {
-			act++
-		} else {
-			inact++
-		}
-	}
-
-	return act, inact, nil
 }

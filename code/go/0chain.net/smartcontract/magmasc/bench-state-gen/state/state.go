@@ -83,14 +83,15 @@ func CloseSciAndDB(sci chain.StateContextI, db *gorocksdb.TransactionDB) error {
 		return err
 	}
 
-	db.Close()
-
 	pNodeDB, ok := sci.GetState().GetNodeDB().(*util.PNodeDB)
 	if !ok {
 		return errors.New("must be PNodeDB type")
 	}
-
 	pNodeDB.Close()
+
+	if db != nil {
+		db.Close()
+	}
 
 	return nil
 }

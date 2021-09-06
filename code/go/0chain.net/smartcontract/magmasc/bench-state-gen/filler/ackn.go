@@ -9,7 +9,7 @@ import (
 
 	"0chain.net/core/encryption"
 	"0chain.net/smartcontract/magmasc"
-	"0chain.net/smartcontract/magmasc/bench/state-generator/rnd"
+	"0chain.net/smartcontract/magmasc/bench-state-gen/rnd"
 )
 
 func createAcknowledgment(sessionID string, consumer *zmc.Consumer, provider *zmc.Provider) *zmc.Acknowledgment {

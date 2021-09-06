@@ -11,7 +11,7 @@ import (
 )
 
 // spend tries to spend the token pool by given amount.
-func spend(txn *tx.Transaction, bill *zmc.Billing, sci chain.StateContextI, tp zmc.TokenPool) error {
+func spend(txn *tx.Transaction, bill *zmc.Billing, sci chain.StateContextI, tp *zmc.TokenPool) error {
 	if bill.Amount < 0 {
 		return errors.New("billing amount is negative")
 	}

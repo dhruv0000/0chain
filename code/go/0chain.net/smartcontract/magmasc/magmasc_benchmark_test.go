@@ -6,13 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"0chain.net/smartcontract/magmasc/bench/state-generator/dir"
+	"0chain.net/smartcontract/magmasc/bench-state-gen/dir"
 )
 
 func BenchmarkMagmaSmartContract_Execute(b *testing.B) {
 	var (
-		actSess, inactSess = countSessions(dir.SciDir, dir.SciLogDir, dir.DbDir, b)
-		sessPostfix        = "_" + strconv.Itoa(actSess) + "as_" + strconv.Itoa(inactSess) + "is"
+		nas, nis    = countSessions(dir.SciDir, dir.SciLogDir, dir.DbDir, b)
+		sessPostfix = "_" + strconv.Itoa(nas) + "as_" + strconv.Itoa(nis) + "is"
 
 		consumers, providers = countNodes(dir.SciDir, dir.SciLogDir, dir.DbDir, b)
 		nodesPostfix         = "_" + strconv.Itoa(consumers) + "c_" + strconv.Itoa(providers) + "p"
