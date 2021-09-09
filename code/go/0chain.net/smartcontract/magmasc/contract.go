@@ -125,6 +125,10 @@ func (m *MagmaSmartContract) consumerRegister(txn *tx.Transaction, blob []byte, 
 		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeConsumerReg, "register consumer failed", err)
 	}
+	if err = db.Commit(); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeConsumerReg, "commit changes failed", err)
+	}
 
 	// update consumer register metric
 	m.SmartContractExecutionStats[consumerRegister].(metrics.Counter).Inc(1)
@@ -243,6 +247,10 @@ func (m *MagmaSmartContract) consumerUpdate(txn *tx.Transaction, blob []byte, sc
 		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeConsumerUpdate, "update consumer list failed", err)
 	}
+	if err = db.Commit(); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeConsumerUpdate, "commit changes failed", err)
+	}
 
 	return string(consumer.Encode()), nil
 }
@@ -308,7 +316,7 @@ func (m *MagmaSmartContract) providerFetch(_ context.Context, vals url.Values, s
 func (m *MagmaSmartContract) providerRegister(txn *tx.Transaction, blob []byte, sci chain.StateContextI) (string, error) {
 	provider := &zmc.Provider{}
 	if err := provider.Decode(blob); err != nil {
-		return "", errors.Wrap(errCodeProviderReg, "decode provider data failed", err)
+		return "", errors.Wrap(errCodeProviderReg, "decode provider failed", err)
 	}
 
 	db := store.GetTransaction(m.db)
@@ -321,6 +329,10 @@ func (m *MagmaSmartContract) providerRegister(txn *tx.Transaction, blob []byte, 
 	if err = list.add(m.ID, provider, db, sci); err != nil {
 		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeProviderReg, "register provider failed", err)
+	}
+	if err = db.Commit(); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeProviderReg, "commit changes failed", err)
 	}
 
 	// update provider register metric
@@ -393,6 +405,10 @@ func (m *MagmaSmartContract) providerUpdate(txn *tx.Transaction, blob []byte, sc
 		_ = db.Conn.Rollback()
 		return "", errors.Wrap(errCodeProviderUpdate, "update providers list failed", err)
 	}
+	if err = db.Commit(); err != nil {
+		_ = db.Conn.Rollback()
+		return "", errors.Wrap(errCodeProviderUpdate, "commit changes failed", err)
+	}
 
 	return string(provider.Encode()), nil
 }
@@ -425,7 +441,7 @@ func (m *MagmaSmartContract) rewardPoolFetch(_ context.Context, vals url.Values,
 func (m *MagmaSmartContract) rewardPoolLock(txn *tx.Transaction, blob []byte, sci chain.StateContextI) (string, error) {
 	var err error
 
-	req := &rewardPoolRequest{txn: txn}
+	req := &tokenPoolReq{txn: txn}
 	if err = req.Decode(blob); err != nil {
 		return "", errors.Wrap(errCodeRewardPoolLock, "decode lock request failed", err)
 	}
@@ -458,7 +474,7 @@ func (m *MagmaSmartContract) rewardPoolLock(txn *tx.Transaction, blob []byte, sc
 func (m *MagmaSmartContract) rewardPoolUnlock(txn *tx.Transaction, blob []byte, sci chain.StateContextI) (string, error) {
 	var err error
 
-	req := &rewardPoolRequest{txn: txn}
+	req := &tokenPoolReq{txn: txn}
 	if err = req.Decode(blob); err != nil {
 		return "", errors.Wrap(errCodeRewardPoolUnlock, "decode unlock request failed", err)
 	}

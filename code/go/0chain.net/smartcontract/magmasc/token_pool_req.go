@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	// rewardPoolRequest represents lock pool request implementation.
-	rewardPoolRequest struct {
+	// tokenPoolReq represents lock pool request implementation.
+	tokenPoolReq struct {
 		ID       string        `json:"id"`
 		Provider *zmc.Provider `json:"provider"`
 		txn      *tx.Transaction
@@ -20,16 +20,16 @@ type (
 )
 
 var (
-	// Make sure rewardPoolRequest implements Serializable interface.
-	_ util.Serializable = (*rewardPoolRequest)(nil)
+	// Make sure tokenPoolReq implements Serializable interface.
+	_ util.Serializable = (*tokenPoolReq)(nil)
 
-	// Make sure rewardPoolRequest implements PoolConfigurator interface.
-	_ zmc.PoolConfigurator = (*rewardPoolRequest)(nil)
+	// Make sure tokenPoolReq implements PoolConfigurator interface.
+	_ zmc.PoolConfigurator = (*tokenPoolReq)(nil)
 )
 
 // Decode implements util.Serializable interface.
-func (m *rewardPoolRequest) Decode(blob []byte) error {
-	var req rewardPoolRequest
+func (m *tokenPoolReq) Decode(blob []byte) error {
+	var req tokenPoolReq
 	if err := json.Unmarshal(blob, &req); err != nil {
 		return errDecodeData.Wrap(err)
 	}
@@ -44,39 +44,39 @@ func (m *rewardPoolRequest) Decode(blob []byte) error {
 }
 
 // Encode implements util.Serializable interface.
-func (m *rewardPoolRequest) Encode() []byte {
+func (m *tokenPoolReq) Encode() []byte {
 	blob, _ := json.Marshal(m)
 	return blob
 }
 
 // PoolBalance implements PoolConfigurator interface.
-func (m *rewardPoolRequest) PoolBalance() int64 {
+func (m *tokenPoolReq) PoolBalance() int64 {
 	return m.txn.Value
 }
 
 // PoolID implements PoolConfigurator interface.
-func (m *rewardPoolRequest) PoolID() string {
+func (m *tokenPoolReq) PoolID() string {
 	return m.ID
 }
 
 // PoolHolderID implements PoolConfigurator interface.
-func (m *rewardPoolRequest) PoolHolderID() string {
+func (m *tokenPoolReq) PoolHolderID() string {
 	return Address
 }
 
 // PoolPayerID implements PoolConfigurator interface.
-func (m *rewardPoolRequest) PoolPayerID() string {
+func (m *tokenPoolReq) PoolPayerID() string {
 	return m.txn.ClientID
 }
 
 // PoolPayeeID implements PoolConfigurator interface.
-func (m *rewardPoolRequest) PoolPayeeID() string {
+func (m *tokenPoolReq) PoolPayeeID() string {
 	return m.Provider.ID
 }
 
 // Validate checks Acknowledgment for correctness.
 // If it is not return errInvalidAcknowledgment.
-func (m *rewardPoolRequest) Validate() (err error) {
+func (m *tokenPoolReq) Validate() (err error) {
 	switch { // is invalid
 	case m.txn == nil:
 		err = errors.New(errCodeInternal, "transaction data is required")

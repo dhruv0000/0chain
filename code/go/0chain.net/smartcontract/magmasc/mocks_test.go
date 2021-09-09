@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	chain "0chain.net/chaincore/chain/state"
+	"0chain.net/chaincore/config"
 	"0chain.net/chaincore/mocks"
 	sci "0chain.net/chaincore/smartcontractinterface"
 	"0chain.net/chaincore/state"
@@ -159,7 +160,7 @@ func mockMagmaSmartContract() *MagmaSmartContract {
 
 	const prefix = "test."
 	msc := &MagmaSmartContract{SmartContract: sci.NewSC(Address)}
-	path := filepath.Join("/tmp", rootPath, prefix+time.Now().Format(time.RFC3339Nano))
+	path := filepath.Join(os.TempDir(), rootPath, prefix+time.Now().Format(time.RFC3339Nano))
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
 		panic(err)
@@ -169,7 +170,6 @@ func mockMagmaSmartContract() *MagmaSmartContract {
 	if err != nil {
 		panic(err)
 	}
-
 	store.AddPool(storeName, msc.db)
 
 	msc.SmartContractExecutionStats[consumerRegister] = metrics.GetOrRegisterCounter("sc:"+msc.ID+":func:"+consumerRegister, nil)

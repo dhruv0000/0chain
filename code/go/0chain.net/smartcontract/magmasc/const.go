@@ -45,7 +45,7 @@ const (
 	// When function is called it means that wallet refunds a locked token pool.
 	rewardPoolUnlock = "reward_pool_unlock"
 
-	// rewardTokenPool contents a value of rewardTokenPool string type.
+	// rewardTokenPool contents a value of reward token pool string type.
 	rewardTokenPool = "reward_token_pool"
 )
 

@@ -176,9 +176,6 @@ func (m *Providers) write(scID string, item *zmc.Provider, db *store.Connection,
 	if _, err := sci.InsertTrieNode(nodeUID(scID, providerType, item.ExtID), item); err != nil {
 		return errors.Wrap(errCodeInternal, "insert provider failed", err)
 	}
-	if err := db.Commit(); err != nil {
-		return errors.Wrap(errCodeInternal, "commit changes failed", err)
-	}
 	if list != nil {
 		m.Sorted = list.Sorted
 	}
