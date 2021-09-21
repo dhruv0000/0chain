@@ -477,6 +477,10 @@ func (m *MagmaSmartContract) providerStakePoolManage(txn *tx.Transaction, provid
 			if err = pool.spend(txn, 0, sci); err != nil {
 				return errors.Wrap(providerStakeTokenPool, "refund stake pool failed", err)
 			}
+
+			if _, err := sci.DeleteTrieNode(nodeUID(m.ID, providerStakeTokenPool, provider.ID)); err != nil {
+				return errors.Wrap(providerStakeTokenPool, "deleting stake pool failed", err)
+			}
 		}
 	}
 
@@ -561,6 +565,10 @@ func (m *MagmaSmartContract) accessPointStakePoolManage(txn *tx.Transaction, ap 
 			}
 			if err = pool.spend(txn, 0, sci); err != nil {
 				return errors.Wrap(accessPointStakeTokenPool, "refund stake pool failed", err)
+			}
+
+			if _, err := sci.DeleteTrieNode(nodeUID(m.ID, accessPointStakeTokenPool, ap.ID)); err != nil {
+				return errors.Wrap(accessPointStakeTokenPool, "deleting stake pool failed", err)
 			}
 		}
 	}
