@@ -126,3 +126,58 @@ func (m *tokenPool) spend(txn *tx.Transaction, amount state.Balance, sci chain.S
 
 	return nil
 }
+
+// spend tries to spend the token pool by given amount with serviceChargeConfigurator.
+func (m *tokenPool) spendWithServiceCharge(txn *tx.Transaction, amount state.Balance, sci chain.StateContextI, serviceCharge float64, serviceID string) error {
+	if amount < 0 {
+		return errors.Wrap(errCodeTokenPoolSpend, "spend amount is negative", errNegativeValue)
+	}
+	if !(serviceCharge >= 0 || serviceCharge < 1) {
+		return errors.New(errCodeTokenPoolSpend, "service charge must be in [0;1) interval")
+	}
+
+	payee, poolBalance := m.PayeeID, state.Balance(m.Balance)
+	switch {
+	case amount > poolBalance: // wrong amount
+		return errors.New(errCodeTokenPoolSpend, "amount greater then pool balance")
+
+	case poolBalance == 0: // nothing to spend
+		return nil
+
+	case amount == 0: // refund token pool to payer
+		payee = m.PayerID
+
+	case amount < poolBalance: // spend part of token pool to payee
+		// paying charge
+		charge := state.Balance(float64(amount) * serviceCharge)
+		if err := sci.AddTransfer(state.NewTransfer(txn.ToClientID, serviceID, charge)); err != nil {
+			return errors.Wrap(errCodeTokenPoolSpend, "transfer token pool failed", err)
+		}
+		poolBalance -= charge
+
+		// paying reward
+		servicePay := amount - charge
+		if err := sci.AddTransfer(state.NewTransfer(txn.ToClientID, payee, servicePay)); err != nil {
+			return errors.Wrap(errCodeTokenPoolSpend, "transfer token pool failed", err)
+		}
+		poolBalance -= servicePay
+
+		payee = m.PayerID // refund remaining token pool balance to payer
+	}
+
+	// spend token pool by balance
+	if err := sci.AddTransfer(state.NewTransfer(txn.ToClientID, payee, poolBalance)); err != nil {
+		return errors.Wrap(errCodeTokenPoolSpend, "spend token pool failed", err)
+	}
+
+	m.Balance = 0
+	m.Transfers = append(m.Transfers, zmc.TokenPoolTransfer{
+		TxnHash:    txn.Hash,
+		FromPool:   m.ID,
+		Value:      int64(amount),
+		FromClient: m.PayerID,
+		ToClient:   m.PayeeID,
+	})
+
+	return nil
+}

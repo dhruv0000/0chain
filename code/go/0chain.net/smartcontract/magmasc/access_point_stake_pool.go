@@ -60,8 +60,7 @@ func (m *accessPointStakeReq) PoolPayeeID() string {
 	return m.AccessPoint.ID
 }
 
-// Validate checks Acknowledgment for correctness.
-// If it is not return errInvalidAcknowledgment.
+// Validate checks accessPointStakeReq for correctness.
 func (m *accessPointStakeReq) Validate() (err error) {
 	switch { // is invalid
 	case m.AccessPoint == nil:

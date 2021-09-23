@@ -73,7 +73,7 @@ func mockSession() *zmc.Session {
 
 	return &zmc.Session{
 		SessionID:   "id:session:" + now,
-		AccessPoint: mockAccessPoint(prov.ID),
+		AccessPoint: mockAccessPoint(prov.ExtID),
 		Billing: zmc.Billing{
 			DataUsage: zmc.DataUsage{
 				DownloadBytes: 3 * million,
@@ -196,6 +196,7 @@ func mockMagmaSmartContract() *MagmaSmartContract {
 
 	msc.SmartContractExecutionStats[consumerRegister] = metrics.GetOrRegisterCounter("sc:"+msc.ID+":func:"+consumerRegister, nil)
 	msc.SmartContractExecutionStats[providerRegister] = metrics.GetOrRegisterCounter("sc:"+msc.ID+":func:"+providerRegister, nil)
+	msc.SmartContractExecutionStats[accessPointRegister] = metrics.GetOrRegisterCounter("sc:"+msc.ID+":func:"+consumerRegister, nil)
 
 	return msc
 }
@@ -255,9 +256,9 @@ func mockStateContextI() *mockStateContext {
 		return nil
 	}
 
-	ackn := mockSession()
-	ackn.SessionID = "cannot_insert_id"
-	stateContext.store[nodeUID(Address, session, ackn.SessionID)] = ackn
+	sess := mockSession()
+	sess.SessionID = "cannot_insert_id"
+	stateContext.store[nodeUID(Address, session, sess.SessionID)] = sess
 
 	stateContext.On("AddTransfer", mock.AnythingOfType("*state.Transfer")).Return(
 		func(transfer *state.Transfer) error {

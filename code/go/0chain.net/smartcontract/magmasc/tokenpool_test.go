@@ -100,11 +100,11 @@ func Test_tokenPool_create(t *testing.T) {
 	txn.Value = sess.AccessPoint.Terms.GetAmount()
 	txn.ClientID = sess.Consumer.ID
 
-	acknClientBalanceErr := mockSession()
-	acknClientBalanceErr.Consumer.ID = ""
+	sessClientBalanceErr := mockSession()
+	sessClientBalanceErr.Consumer.ID = ""
 
-	acknInsufficientFundsErr := mockSession()
-	acknInsufficientFundsErr.Consumer.ID = "insolvent_id"
+	sessInsufficientFundsErr := mockSession()
+	sessInsufficientFundsErr.Consumer.ID = "insolvent_id"
 
 	tests := [3]struct {
 		name  string
@@ -133,7 +133,7 @@ func Test_tokenPool_create(t *testing.T) {
 		{
 			name:  "Client_Balance_ERR",
 			txn:   txn,
-			sess:  acknClientBalanceErr,
+			sess:  sessClientBalanceErr,
 			pool:  &tokenPool{},
 			sci:   sci,
 			want:  nil,
@@ -142,7 +142,7 @@ func Test_tokenPool_create(t *testing.T) {
 		{
 			name:  "Insufficient_Funds_ERR",
 			txn:   txn,
-			sess:  acknInsufficientFundsErr,
+			sess:  sessInsufficientFundsErr,
 			pool:  &tokenPool{},
 			sci:   sci,
 			want:  nil,

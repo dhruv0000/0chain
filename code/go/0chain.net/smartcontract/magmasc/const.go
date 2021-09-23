@@ -22,6 +22,9 @@ const (
 	// providerMinStake represents the key of a provider min stake config.
 	providerMinStake = "provider.min_stake"
 
+	// serviceCharge represents the key of a service charge config.
+	serviceCharge = "service_charge"
+
 	// rootPath describes the magma smart contract's root path.
 	rootPath = ".0chain.net"
 
@@ -116,7 +119,7 @@ const (
 	accessPointUpdate = "access_point_update"
 
 	// accessPointMinStake represents the key of a access point min stake config.
-	accessPointMinStake = "provider.min_stake"
+	accessPointMinStake = "access_point.min_stake"
 
 	// accessPointStakeTokenPool contents a value of access point's stake token pool string type.
 	accessPointStakeTokenPool = "access_point_stake_token_pool"

@@ -74,8 +74,7 @@ func (m *tokenPoolReq) PoolPayeeID() string {
 	return m.Provider.ID
 }
 
-// Validate checks Acknowledgment for correctness.
-// If it is not return errInvalidAcknowledgment.
+// Validate checks tokenPoolReq for correctness.
 func (m *tokenPoolReq) Validate() (err error) {
 	switch { // is invalid
 	case m.txn == nil:

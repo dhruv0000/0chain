@@ -208,8 +208,9 @@ func (m *MagmaSmartContract) consumerSessionStop(txn *tx.Transaction, blob []byt
 		if err = pool.Decode(sess.TokenPool.Encode()); err != nil {
 			return "", errors.New(errCodeSessionStop, err.Error())
 		}
-		// see finalizeAllocation
-		if err = pool.spend(txn, state.Balance(sess.Billing.Amount), sci); err != nil {
+
+		servCharge, serviceID := m.cfg.GetFloat64(serviceCharge), sess.Provider.ID
+		if err = pool.spendWithServiceCharge(txn, state.Balance(sess.Billing.Amount), sci, servCharge, serviceID); err != nil {
 			return "", errors.New(errCodeSessionStop, err.Error())
 		}
 
@@ -369,19 +370,28 @@ func (m *MagmaSmartContract) providerSessionInit(txn *tx.Transaction, blob []byt
 	if req.Provider, err = providerFetch(m.ID, req.Provider.ExtID, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeSessionInit, "fetch provider failed", err)
 	}
-	if req.Provider.ID != txn.ClientID {
-		return "", errors.Wrap(errCodeSessionInit, "check owner id failed", err)
+	switch { // validate provider's preconditions
+	case req.Provider.ID != txn.ClientID:
+		return "", errors.New(errCodeSessionInit, "check owner id failed")
+
+	case req.Provider.MinStake == 0:
+		return "", errors.New(errCodeSessionInit, "session can not be started with 0 min-staked provider")
 	}
 
 	if req.AccessPoint, err = accessPointFetch(m.ID, req.AccessPoint.ID, m.db, sci); err != nil {
 		return "", errors.Wrap(errCodeSessionInit, "fetch access point failed", err)
 	}
-	if err = req.AccessPoint.Terms.Validate(); err != nil {
-		return "", errors.Wrap(errCodeSessionInit, "invalid access point terms", err)
-	}
+	switch { // validate access point's preconditions
+	case req.AccessPoint.MinStake == 0:
+		return "", errors.New(errCodeSessionInit, "session can not be initialized with 0 min-staked access point")
 
-	if req.AccessPoint.ProviderExtID != req.Provider.ExtID {
-		return "", errors.Wrap(errCodeSessionInit, "access point is not registered with provider", err)
+	case req.AccessPoint.ProviderExtID != req.Provider.ExtID:
+		return "", errors.New(errCodeSessionInit, "access point is not registered with provider")
+
+	default:
+		if err = req.AccessPoint.Terms.Validate(); err != nil {
+			return "", errors.Wrap(errCodeSessionInit, "invalid access point terms", err)
+		}
 	}
 
 	req.Consumer, err = consumerFetch(m.ID, req.Consumer.ExtID, m.db, sci)
@@ -595,12 +605,9 @@ func (m *MagmaSmartContract) accessPointUpdate(txn *tx.Transaction, blob []byte,
 		return "", errors.Wrap(errCodeAccessPointUpdate, "provider is not registered", err)
 	}
 
-	got, err := accessPointFetch(m.ID, ap.ID, m.db, sci)
+	_, err = accessPointFetch(m.ID, ap.ID, m.db, sci)
 	if err != nil {
 		return "", errors.Wrap(errCodeAccessPointUpdate, "fetch access point failed", err)
-	}
-	if got.ID != txn.ClientID {
-		return "", errors.Wrap(errCodeAccessPointUpdate, "check owner id failed", err)
 	}
 
 	db := store.GetTransaction(m.db)

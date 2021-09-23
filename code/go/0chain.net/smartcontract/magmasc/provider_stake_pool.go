@@ -60,8 +60,7 @@ func (m *providerStakeReq) PoolPayeeID() string {
 	return m.Provider.ID
 }
 
-// Validate checks Acknowledgment for correctness.
-// If it is not return errInvalidAcknowledgment.
+// Validate checks providerStakeReq for correctness.
 func (m *providerStakeReq) Validate() (err error) {
 	switch { // is invalid
 	case m.Provider == nil:
