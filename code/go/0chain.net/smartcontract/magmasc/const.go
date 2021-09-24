@@ -128,7 +128,7 @@ const (
 const (
 	// AllAccessPointsKey is a concatenated Address
 	// and SHA3-256 hex encoded hash of "all_access_points" string.
-	AllAccessPointsKey = Address // + "7e306c02ea1719b598aaf9dc7516eb930cd47c5360d974e22ab01e21d66a93d8" TODO
+	AllAccessPointsKey = Address + "b0473d07c62a69f3d03165d3afc670045b8471309102e169fc2e990bd065e74c"
 
 	// accessPointType contents a value of type of Access Point's node.
 	accessPointType = "access-point"
