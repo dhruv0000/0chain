@@ -29,7 +29,7 @@ var (
 
 // Decode implements util.Serializable interface.
 func (m *tokenPoolReq) Decode(blob []byte) error {
-	var req tokenPoolReq
+	req := tokenPoolReq{txn: m.txn}
 	if err := json.Unmarshal(blob, &req); err != nil {
 		return errDecodeData.Wrap(err)
 	}
